@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+################################################################################
+# timecard - Timekeeping from a csv.
+# Copyright (C) 2023  OneRedDime
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+################################################################################
+
+
+PROGNAME="$(basename $0)"
+
+# Check for valid date program.
+DATEPROG=$(which gdate)
+if [ "$?" != "0" ]
+then
+    DATEPROG=$(which date)
+    if ! [[ "$($DATEPROG --version)" =~ "GNU" ]]
+    then
+        echo "ERROR: GNU date is a requirement."
+    fi
+fi
+
+function print_lines
+{
+    lines=$(cat timecard.csv)
+
+    if [ ! -z "$1" ]
+    then
+        lines=$(grep "$1" <<< $lines)
+    fi
+
+    if [ ! -z "$2" ]
+    then
+        lines=$(grep $2 <<< $lines)
+    fi
+
+    echo "$lines"
+}
+
+function print_hours
+{
+    lines=$(print_lines "$1" "$2")
+    hours=$(echo "$lines" | awk -F "\"*,\"*" '{print $2}')
+    expr=""
+    for entry in $hours
+    do
+        expr="$entry + $expr"
+    done
+
+    echo "-($expr 0)" | bc
+}
+
+function usage
+{
+    echo "\
+usage: $PROGNAME [option].. operation pattern
+
+Print information about a timecard.
+
+Operation
+
+  check                 If a \"pattern\" file exists, then report line numbers
+                        which contain entries that don't match any pattern.
+
+  hours                 Print hours for target lines.
+  lines                 Print entries for matching lines or hours.
+  mkentry               Add a new line to the timecard for today.
+  week                  Report entries and hours worked for the week.
+
+Options
+
+  -d, --date            Target entries based on this date.
+
+  --version             Print the version of timecard and exit.
+  -h, --help            Print this help message and exit.
+
+Args
+
+  pattern               Filter lines based on entries that match the pattern."
+}
+
+ARGS=$(getopt -o d:vh -l date:,version,help -- "$@")
+if [ "$?" != "0" ]
+then
+    exit 1
+fi
+
+eval set -- "$ARGS"
+
+# Process opts mixed with positional args
+date=""
+fmt="%Y/%m/%d"
+while true ; do
+    case "$1" in
+        -d|--date)
+            date=$($DATEPROG -d $2 +"$fmt")
+            shift 2
+            ;;
+        -v|--version)
+            echo "0.0.0"
+            exit 0
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# set operation and pattern.
+operation=$1
+
+if [ -z $operation ]
+then
+    echo "ERROR: Invalid operation."
+    exit 1
+fi
+
+shift
+pattern="$@"
+
+if [ $operation == "check" ]
+then
+    echo "TODO"
+    exit 1
+elif [ $operation == "hours" ]
+then
+    if [ -z "$pattern" ] && [ -z "$date" ]
+    then
+        date="$($DATEPROG+"$fmt")"
+    fi
+
+    print_hours "$date" "$pattern"
+
+elif [ $operation == "lines" ]
+then
+    if [ -z "$pattern" ] && [ -z "$date" ]
+    then
+        date="$($DATEPROG +"$fmt")"
+    fi
+
+    print_lines "$date" "$pattern"
+
+elif [ $operation == "mkentry" ]
+then
+    echo $(date +"$fmt") >> timecard.csv
+elif [ $operation == "week" ]
+then
+    # pweek
+    weekday=$($DATEPROG +"%w")
+    Sday=$($DATEPROG -d "$date - $weekday days" +"$fmt")
+    mday=$($DATEPROG -d "$Sday + 1 day" +"$fmt")
+    Tday=$($DATEPROG -d "$Sday + 2 day" +"$fmt")
+    wday=$($DATEPROG -d "$Sday + 3 day" +"$fmt")
+    tday=$($DATEPROG -d "$Sday + 4 day" +"$fmt")
+    fday=$($DATEPROG -d "$Sday + 5 day" +"$fmt")
+    sday=$($DATEPROG -d "$Sday + 6 day" +"$fmt")
+
+    Shours="$(print_hours "$Sday" "$pattern")"
+    mhours="$(print_hours "$mday" "$pattern")"
+    Thours="$(print_hours "$Tday" "$pattern")"
+    whours="$(print_hours "$wday" "$pattern")"
+    thours="$(print_hours "$tday" "$pattern")"
+    fhours="$(print_hours "$fday" "$pattern")"
+    shours="$(print_hours "$sday" "$pattern")"
+
+    print_lines "$Sday" "$pattern"
+    print_lines "$mday" "$pattern"
+    print_lines "$Tday" "$pattern"
+    print_lines "$wday" "$pattern"
+    print_lines "$tday" "$pattern"
+    print_lines "$fday" "$pattern"
+    print_lines "$sday" "$pattern"
+
+    echo Sunday: $Shours
+    echo Monday: $mhours
+    echo Tuesday: $Thours
+    echo Wednesday: $whours
+    echo Thursday: $thours
+    echo Friday: $fhours
+    echo Saturday: $shours
+
+    total=$(echo $Shours + $mhours + $Thours + $whours + $thours + $fhours + $shours | bc)
+    echo Total: $total
+fi
