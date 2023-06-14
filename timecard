@@ -71,9 +71,6 @@ Print information about a timecard.
 
 Operation
 
-  check                 If a \"pattern\" file exists, then report line numbers
-                        which contain entries that don't match any pattern.
-
   hours                 Print hours for target lines.
   lines                 Print entries for matching lines or hours.
   mkentry               Add a new line to the timecard for today.
@@ -139,11 +136,7 @@ fi
 shift
 pattern="$@"
 
-if [ $operation == "check" ]
-then
-    echo "TODO"
-    exit 1
-elif [ $operation == "hours" ]
+if [ $operation == "hours" ]
 then
     if [ -z "$pattern" ] && [ -z "$date" ]
     then
