@@ -12,7 +12,7 @@ run the timecard program with the ``--help`` option to see usage instructions.
 
 CSV Format
 ==========
-The expected format for the entires is very simple. Each line has a date,
+The expected format for the entries is very simple. Each line has a date,
 hourly range, and description like so.
 
 ::
