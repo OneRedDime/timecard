@@ -102,7 +102,7 @@ fmt="%Y/%m/%d"
 while true ; do
     case "$1" in
         -d|--date)
-            date=$($DATEPROG -d $2 +"$fmt")
+            date=$($DATEPROG -d "$2" +"$fmt")
             shift 2
             ;;
         -v|--version)
